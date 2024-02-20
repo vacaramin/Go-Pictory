@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
-	"os"
 )
 
 const (
@@ -15,21 +14,30 @@ const (
 )
 
 func initRequest(w http.ResponseWriter, r *http.Request) {
-	url := WebsiteURL + r.URL.Path
-	response := makeRequest(url)
+	response := makeRequest(WebsiteURL + r.URL.Path)
 
-	contentType := response.Header.Get("Content-Type")
-	httpCode := response.StatusCode
+	responseBody := response.Body
+	responseInfo := response.Header.Get("responseInfo")
 
-	if contentEncoding := response.Header.Get("Content-Encoding"); contentEncoding != "" {
-		if contentEncoding == "gzip" {
+	response.Header.Set("content-type", "text/html")
+	response.StatusCode = 200
+
+	if response.Header.Get("content-encoding") != "" {
+		if response.Header.Get("content-encoding") == "gzip" {
 			// Implement gzdecode if necessary
 		} else {
-			w.Header().Set("Content-Encoding", contentEncoding)
+			w.Header().Set("Content-Encoding", "")
 		}
 	}
 
-	headersToRemove := []string{
+}
+
+func makeRequest(url string) *http.Response {
+	request, err := http.NewRequest("GET", WebsiteURL, nil)
+	if err != nil {
+		log.Println("failed to make request")
+	}
+	var headersToRemove = []string{
 		"Accept-Ranges",
 		"Content-Length",
 		"Keep-Alive",
@@ -49,40 +57,10 @@ func initRequest(w http.ResponseWriter, r *http.Request) {
 		"last-modified",
 		"etag",
 	}
-
-	for _, item := range headersToRemove {
-		response.Header.Del(item)
+	for _, header := range headersToRemove {
+		request.Header.Del(header)
 	}
-
-	for key := range response.Header {
-		w.Header().Set(key, response.Header.Get(key))
-	}
-
-	w.Header().Set("Content-Type", contentType)
-	w.WriteHeader(httpCode)
-
-	if httpCode == 200 || httpCode == 404 {
-		w.Write([]byte(response.Body))
-	} else {
-		// Handle other HTTP response codes if needed
-	}
-}
-
-func makeRequest(url string) *http.Response {
-	parsedURL, err := url.Parse(WebsiteURL)
-	if err != nil {
-		fmt.Println("Error parsing URL:", err)
-		os.Exit(1)
-	}
-
-	if md5Hash(parsedURL.Host) != "c50561ab67a775fe234424466c179f82" {
-		fmt.Println("Invalid host")
-		os.Exit(1)
-	}
-
-	// Implement other conditions and request logic as per PHP code
-
-	return nil // Return HTTP response object
+	return &http.Response{}
 }
 
 func md5Hash(s string) string {
